@@ -17,7 +17,7 @@ import java.util.zip.ZipInputStream;
 public class FileParser {
     private static final Logger LOG = LoggerFactory.getLogger(FileParser.class);
 
-    public void parseFiles(String rootFolderPath, boolean delete) throws IllegalArgumentException {
+    public void parseFiles(String rootFolderPath, boolean delete, boolean shouldCopy) throws IllegalArgumentException {
         if (rootFolderPath != null && !rootFolderPath.isEmpty()) {
             File root = new File(rootFolderPath);
             LOG.info("The root file is: " + rootFolderPath);
@@ -26,13 +26,13 @@ public class FileParser {
                     List<File> filesToUnzip = getFilesInSubfolders(root, isFileProcessable());
                     //unzip files if there are any
                     filesToUnzip.stream().filter(file -> isFileZip().test(file.getName())).forEach(file -> {
-                        unzipFile(file);
+                        unzipFile(file,root,shouldCopy);
                         deleteFile(file, delete);
                     });
                     //merge files if there any splitted
-                    processRarFiles(filesToUnzip.stream().filter(this::isFileSplittedOrRar).collect(Collectors.toList()), delete);
+                    processRarFiles(filesToUnzip.stream().filter(this::isFileSplittedOrRar).collect(Collectors.toList()), delete,shouldCopy,root);
                 } else if (root.isFile() && isFileZip().test(root.getName())) {
-                    unzipFile(root);
+                    unzipFile(root, root, shouldCopy);
                     deleteFile(root, delete);
                 } else {
                     throw new IllegalArgumentException("This file is not a folder or zip file!");
@@ -45,18 +45,23 @@ public class FileParser {
         }
     }
 
-    private void processRarFiles(List<File> splittedFiles, boolean deleteFile) {
+    private void processRarFiles(List<File> splittedFiles, boolean deleteFile, boolean shouldCopy, File root) {
         LOG.info("Start rarfiles processing!");
         Map<String, List<File>> rarFilesMap = groupFilesByName(splittedFiles);
         ExtractArchive extractArchive = new ExtractArchive();
         for (List<File> fileList : rarFilesMap.values()) {
             File rar = fileList.stream().filter(file -> file.getName().contains(".rar")).findAny().orElse(null);
             if (rar != null) {
-                LOG.info("Process file: " +rar.getName());
-                extractArchive.extractArchive(rar, rar.getParentFile());
+                File parentFolder = shouldCopy && root.isDirectory() ? root : rar.getParentFile();
+                LOG.info("Process file: " + rar.getName());
+                extractArchive.extractArchive(rar, parentFolder);
                 fileList.forEach(file -> deleteFile(file, deleteFile));
             } else {
-                throw new IllegalArgumentException("This rip format not valid!");
+                if (fileList.size() > 0) {
+                    LOG.error("In this folder cannot merge rip files: " + fileList.get(0).getPath());
+                }else{
+                    LOG.error("Error while processing!");
+                }
             }
         }
         LOG.info("Processing ended!");
@@ -144,7 +149,7 @@ public class FileParser {
         return s -> s.contains(".zip");
     }
 
-    private void unzipFile(File file) {
+    private void unzipFile(File file, File root, boolean shouldCopy) {
         LOG.info("Starts unzipping!");
         byte[] buffer = new byte[1024];
 
@@ -153,7 +158,8 @@ public class FileParser {
                 for (ZipEntry entry = zis.getNextEntry(); entry != null; entry = zis.getNextEntry()) {
                     String fileName = entry.getName();
                     LOG.info("Unzipping file: " + fileName);
-                    File newFile = new File(file.getParent() + File.separator + fileName);
+                    String parentPath =  shouldCopy && root.isDirectory() ? root.getAbsolutePath() : file.getParent();
+                    File newFile = new File(parentPath + File.separator + fileName);
                     new File(newFile.getParent()).mkdirs();
                     try (FileOutputStream fos = new FileOutputStream(newFile)) {
                         int len;
@@ -165,7 +171,7 @@ public class FileParser {
                 }
             }
         } catch (java.io.IOException e) {
-            throw new IllegalArgumentException("Cannot open this file!");
+            LOG.error("Cannot open this file: " + file.getName());
         }
         LOG.info("Unzipping ended!");
     }

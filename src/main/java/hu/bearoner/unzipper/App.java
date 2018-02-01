@@ -26,9 +26,14 @@ public class App {
             System.out.println("Should delete files after processing?(Y/N)");
             shouldDelete = scanner.next();
         }
+        String shouldCopy = "";
+        while (!shouldCopy.equalsIgnoreCase("Y") && !shouldCopy.equalsIgnoreCase("N")) {
+            System.out.println("Copy decompressed files to the root folder?(Y/N)");
+            shouldCopy = scanner.next();
+        }
         FileParser fileParser = new FileParser();
         try {
-            fileParser.parseFiles(filePath, shouldDelete.equalsIgnoreCase("Y"));
+            fileParser.parseFiles(filePath, shouldDelete.equalsIgnoreCase("Y"),shouldCopy.equalsIgnoreCase("Y"));
         }catch (IllegalArgumentException e){
             LOG.error(e.getMessage());
         }
