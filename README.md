@@ -1,5 +1,6 @@
 # unzipper
-Java cli app for decompress files in zip, rar, and Winrar rip format. Useage:
+Java cli app for decompress files in zip, rar, and Winrar rip format. <br />
+Useage:<br />
 <br />
 Build with maven <br />
 Run java -jar <br />
